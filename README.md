@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # console-chat
 
 To install dependencies:
@@ -13,3 +14,6 @@ bun run src/index.ts
 ```
 
 This project was created using `bun init` in bun v1.4.0. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+=======
+# Console-Chat
+>>>>>>> ee161358183b09f24f7bcc1d9454ba995540226d
