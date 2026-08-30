@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { validateUsername, validateMessage } from "./validation";
+import { validateUsername, validateMessage, isGibberish } from "./validation";
 import { UserService, isValidUsername } from "../user/UserService";
+import { parseCommand } from "../command/command";
 
 describe("validateUsername", () => {
     describe("1. Valid usernames", () => {
@@ -9,22 +10,88 @@ describe("validateUsername", () => {
             expect(validateUsername("User123")).toBeNull();
             expect(validateUsername("super-dev")).toBeNull();
             expect(validateUsername("Alice")).toBeNull();
-        });
-
-        it("allows valid Thai usernames", () => {
-            expect(validateUsername("สมชาย")).toBeNull();
-            expect(validateUsername("มานี")).toBeNull();
-            expect(validateUsername("ปลาวาฬ_01")).toBeNull();
+            expect(validateUsername("David99")).toBeNull();
+            expect(validateUsername("CoolGamer")).toBeNull();
+            expect(validateUsername("Sammy")).toBeNull();
+            expect(validateUsername("Tommy")).toBeNull();
+            expect(validateUsername("Anna")).toBeNull();
+            expect(validateUsername("Aaron")).toBeNull();
         });
 
         it("allows usernames with valid boundary lengths (3 to 20 chars)", () => {
-            expect(validateUsername("abc")).toBeNull();
-            expect(validateUsername("12345678901234567890")).toBeNull();
-            expect(validateUsername("กขค")).toBeNull();
+            expect(validateUsername("Sam")).toBeNull();
+            expect(validateUsername("Ben")).toBeNull();
+            expect(validateUsername("Max")).toBeNull();
+            expect(validateUsername("SuperGamer2024_Pro")).toBeNull();
         });
     });
 
-    describe("2. Special / Weird character restrictions", () => {
+    describe("2. Non-name / Gibberish restriction (ตั้งชื่อไม่เป็นชื่อไม่ได้ เช่น afs, sgs, aats, weqtwetsa)", () => {
+        it("rejects non-names like 'afs', 'sgs', 'aats', 'weqtwetsa'", () => {
+            expect(validateUsername("afs")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("sgs")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("aats")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("weqtwetsa")).toBe("Username cannot be random or gibberish text");
+        });
+
+        it("rejects alternating repeating patterns like 'adada'", () => {
+            expect(validateUsername("adada")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("ababa")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("xyxyx")).toBe("Username cannot be random or gibberish text");
+        });
+
+        it("rejects keyboard smash / consonant clusters like 'gdasfddc232'", () => {
+            expect(validateUsername("gdasfddc232")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("bcdfghjk")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("asdfgh")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("qwer123")).toBe("Username cannot be random or gibberish text");
+            expect(validateUsername("zxcvbn")).toBe("Username cannot be random or gibberish text");
+        });
+    });
+
+    describe("3. Consecutive characters limit changed from 3 to 2 (ซ้ำเกิน 2 ตัวติดกันไม่ได้)", () => {
+        it("rejects more than 2 consecutive identical characters (e.g. aaa, ooo, eeee)", () => {
+            expect(validateUsername("aaa")).toBe("Username cannot contain more than 2 consecutive identical characters");
+            expect(validateUsername("coool")).toBe("Username cannot contain more than 2 consecutive identical characters");
+            expect(validateUsername("aaaagww")).toBe("Username cannot contain more than 2 consecutive identical characters");
+            expect(validateUsername("ssgeeeecdfg")).toBe("Username cannot contain more than 2 consecutive identical characters");
+            expect(validateUsername("userxxxx")).toBe("Username cannot contain more than 2 consecutive identical characters");
+            expect(validateUsername("111player")).toBe("Username cannot contain more than 2 consecutive identical characters");
+        });
+
+        it("allows up to 2 consecutive identical characters (e.g. Sammy, Tommy, Anna, Cool)", () => {
+            expect(validateUsername("Sammy")).toBeNull();
+            expect(validateUsername("Tommy")).toBeNull();
+            expect(validateUsername("Anna")).toBeNull();
+            expect(validateUsername("Cool_Dev")).toBeNull();
+        });
+    });
+
+    describe("4. Pure numbers restriction (ตั้งชื่อเป็นตัวเลขไม่ได้)", () => {
+        it("rejects purely numeric usernames or usernames with no English letters", () => {
+            expect(validateUsername("12345")).toBe("Username cannot be purely numbers and must contain English letters");
+            expect(validateUsername("999")).toBe("Username cannot be purely numbers and must contain English letters");
+            expect(validateUsername("007")).toBe("Username cannot be purely numbers and must contain English letters");
+            expect(validateUsername("123_456")).toBe("Username cannot be purely numbers and must contain English letters");
+        });
+
+        it("allows alphanumeric usernames containing both letters and numbers", () => {
+            expect(validateUsername("Player1")).toBeNull();
+            expect(validateUsername("Alex99")).toBeNull();
+            expect(validateUsername("dev_01")).toBeNull();
+        });
+    });
+
+    describe("5. Thai language restriction (ตั้งชื่อภาษาไทยไม่ได้)", () => {
+        it("rejects Thai characters in username", () => {
+            expect(validateUsername("สมชาย")).toBe("Username cannot contain Thai characters");
+            expect(validateUsername("ภาษาไทย")).toBe("Username cannot contain Thai characters");
+            expect(validateUsername("ทดสอบ123")).toBe("Username cannot contain Thai characters");
+            expect(validateUsername("userไทย")).toBe("Username cannot contain Thai characters");
+        });
+    });
+
+    describe("6. Special / Weird character restrictions", () => {
         it("rejects special symbols and punctuation", () => {
             expect(validateUsername("john@doe")).toContain("invalid characters");
             expect(validateUsername("user!*#")).toContain("invalid characters");
@@ -40,19 +107,18 @@ describe("validateUsername", () => {
         });
     });
 
-    describe("3. Length restrictions (Max 20 chars, Min 3 chars)", () => {
+    describe("7. Length restrictions (Max 20 chars, Min 3 chars)", () => {
         it("rejects usernames shorter than 3 characters", () => {
             expect(validateUsername("a")).toBe("Username must be at least 3 characters");
             expect(validateUsername("ab")).toBe("Username must be at least 3 characters");
         });
 
         it("rejects usernames longer than 20 characters", () => {
-            expect(validateUsername("a".repeat(21))).toBe("Username must not exceed 20 characters");
-            expect(validateUsername("123456789012345678901")).toBe("Username must not exceed 20 characters");
+            expect(validateUsername("abcdefghijklmnopqrst1")).toBe("Username must not exceed 20 characters");
         });
     });
 
-    describe("4. Reserved and strange names (Admin, System, fackAdmin, etc.)", () => {
+    describe("8. Reserved and strange names (Admin, System, fackAdmin, etc.)", () => {
         it("rejects 'Admin' and case-insensitive variations", () => {
             expect(validateUsername("Admin")).not.toBeNull();
             expect(validateUsername("admin")).not.toBeNull();
@@ -89,7 +155,7 @@ describe("validateUsername", () => {
         });
     });
 
-    describe("5. Emoji restrictions", () => {
+    describe("9. Emoji restrictions", () => {
         it("rejects usernames containing emojis", () => {
             expect(validateUsername("😀user")).toBe("Username cannot contain emojis");
             expect(validateUsername("user🔥")).toBe("Username cannot contain emojis");
@@ -98,7 +164,7 @@ describe("validateUsername", () => {
         });
     });
 
-    describe("6. Invisible characters and blank messages", () => {
+    describe("10. Invisible characters and blank messages", () => {
         it("rejects zero-width and invisible characters", () => {
             expect(validateUsername("\u200B\u200B\u200B")).toBe("Username cannot contain invisible characters or blank messages");
             expect(validateUsername("\uFEFFuser")).toBe("Username cannot contain invisible characters or blank messages");
@@ -113,7 +179,7 @@ describe("validateUsername", () => {
         });
     });
 
-    describe("7. Null / Undefined safety without crash", () => {
+    describe("11. Null / Undefined safety without crash", () => {
         it("safely handles null and undefined without crashing", () => {
             expect(validateUsername(null)).toBe("Username is required");
             expect(validateUsername(undefined)).toBe("Username is required");
@@ -150,10 +216,48 @@ describe("validateMessage", () => {
     });
 });
 
+describe("Case-Insensitive Commands (parseCommand)", () => {
+    it("handles /help in lowercase, uppercase, and mixed case", () => {
+        expect(parseCommand("/help")).toEqual({ type: "HELP" });
+        expect(parseCommand("/HELP")).toEqual({ type: "HELP" });
+        expect(parseCommand("/Help")).toEqual({ type: "HELP" });
+        expect(parseCommand("/hElP")).toEqual({ type: "HELP" });
+    });
+
+    it("handles /quit in lowercase, uppercase, and mixed case", () => {
+        expect(parseCommand("/quit")).toEqual({ type: "QUIT" });
+        expect(parseCommand("/QUIT")).toEqual({ type: "QUIT" });
+        expect(parseCommand("/Quit")).toEqual({ type: "QUIT" });
+    });
+
+    it("handles /users in lowercase, uppercase, and mixed case", () => {
+        expect(parseCommand("/users")).toEqual({ type: "USERS" });
+        expect(parseCommand("/USERS")).toEqual({ type: "USERS" });
+        expect(parseCommand("/Users")).toEqual({ type: "USERS" });
+    });
+
+    it("handles /clear in lowercase, uppercase, and mixed case", () => {
+        expect(parseCommand("/clear")).toEqual({ type: "CLEAR" });
+        expect(parseCommand("/CLEAR")).toEqual({ type: "CLEAR" });
+        expect(parseCommand("/Clear")).toEqual({ type: "CLEAR" });
+    });
+
+    it("treats regular messages as MESSAGE type", () => {
+        expect(parseCommand("Hello everyone")).toEqual({ type: "MESSAGE", content: "Hello everyone" });
+    });
+});
+
 describe("UserService & isValidUsername integration", () => {
     it("validates using isValidUsername correctly", () => {
         expect(isValidUsername("ValidUser")).toBe(true);
+        expect(isValidUsername("12345")).toBe(false);
+        expect(isValidUsername("adada")).toBe(false);
+        expect(isValidUsername("afs")).toBe(false);
+        expect(isValidUsername("sgs")).toBe(false);
+        expect(isValidUsername("aats")).toBe(false);
+        expect(isValidUsername("weqtwetsa")).toBe(false);
         expect(isValidUsername("Admin")).toBe(false);
+        expect(isValidUsername("สมชาย")).toBe(false);
         expect(isValidUsername(null)).toBe(false);
         expect(isValidUsername(undefined)).toBe(false);
     });

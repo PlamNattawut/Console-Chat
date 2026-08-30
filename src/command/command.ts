@@ -21,26 +21,27 @@ export const parseCommand = (
 ): Command => {
 
     const value = input.trim();
+    const lower = value.toLowerCase();
 
-    if (value === "/help") {
+    if (lower === "/help") {
         return {
             type: "HELP"
         };
     }
 
-    if (value === "/users") {
+    if (lower === "/users") {
         return {
             type: "USERS"
         };
     }
 
-    if (value === "/clear") {
+    if (lower === "/clear") {
         return {
             type: "CLEAR"
         };
     }
 
-    if (value === "/quit") {
+    if (lower === "/quit") {
         return {
             type: "QUIT"
         };
