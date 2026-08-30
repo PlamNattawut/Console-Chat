@@ -54,8 +54,7 @@ export class ChatServer {
     private handleAction(socket: WebSocket, action: ClientAction): void {
         switch (action.type) {
             case "JOIN": {
-                const username = action.username?.trim();
-                const validationError = validateUsername(username);
+                const validationError = validateUsername(action.username);
                 if (validationError) {
                     this.sendTo(socket, {
                         type: "JOIN_RESPONSE",
@@ -65,6 +64,7 @@ export class ChatServer {
                     return;
                 }
 
+                const username = action.username!.trim();
                 if (this.userService.isUsernameTaken(username)) {
                     this.sendTo(socket, {
                         type: "JOIN_RESPONSE",
@@ -112,7 +112,7 @@ export class ChatServer {
                     return;
                 }
 
-                const message = createMessage(user.username, action.content);
+                const message = createMessage(user.username, action.content!);
                 this.broadcast({
                     type: "MESSAGE",
                     message

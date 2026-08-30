@@ -1,4 +1,5 @@
 import { User } from "../contracts/user";
+import { validateUsername } from "../validation/validation";
 
 export class UserService {
     private readonly users = new Map<string, User>();
@@ -18,7 +19,10 @@ export class UserService {
         return this.users.get(id);
     }
 
-    getUserByUsername(username: string): User | undefined {
+    getUserByUsername(username: string | null | undefined): User | undefined {
+        if (!username || typeof username !== "string") {
+            return undefined;
+        }
         const normalized = username.trim().toLowerCase();
         for (const user of this.users.values()) {
             if (user.username.trim().toLowerCase() === normalized) {
@@ -28,7 +32,10 @@ export class UserService {
         return undefined;
     }
 
-    isUsernameTaken(username: string): boolean {
+    isUsernameTaken(username: string | null | undefined): boolean {
+        if (!username || typeof username !== "string") {
+            return false;
+        }
         return this.getUserByUsername(username) !== undefined;
     }
 
@@ -42,6 +49,6 @@ export class UserService {
 }
 
 export const isValidUsername = (
-    username: string
+    username: unknown
 ): boolean =>
-    username.trim().length >= 3;
+    validateUsername(username) === null;

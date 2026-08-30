@@ -40,27 +40,28 @@ export class App {
         );
 
         this.ui.onSubmit((input) => {
-            if (!input) return;
-
             if (this.state === "AWAITING_USERNAME") {
                 this.handleUsernameSubmit(input);
             } else {
+                if (!input) return;
                 this.handleChatSubmit(input);
             }
         });
     }
 
-    private handleUsernameSubmit(input: string): void {
+    private handleUsernameSubmit(input: unknown): void {
         const error = validateUsername(input);
         if (error) {
             this.ui?.addMessage(`⚠️ ${error}`);
+            this.ui?.addMessage("👉 Please enter a valid username to continue:");
             return;
         }
 
-        this.ui?.addMessage(`⏳ Checking availability for "${input}"...`);
+        const username = typeof input === "string" ? input.trim() : "";
+        this.ui?.addMessage(`⏳ Checking availability for "${username}"...`);
         this.client.sendAction({
             type: "JOIN",
-            username: input
+            username: username
         });
     }
 
@@ -114,6 +115,7 @@ export class App {
             case "JOIN_RESPONSE":
                 if (!event.success) {
                     this.ui?.addMessage(`❌ ${event.error ?? "Failed to join"}`);
+                    this.ui?.addMessage("👉 Please enter a different username:");
                 } else if (event.user) {
                     this.currentUser = event.user;
                     this.state = "CHATTING";

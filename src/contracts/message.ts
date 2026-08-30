@@ -6,8 +6,8 @@ export interface Message {
 }
 
 export type ClientAction =
-    | { type: "JOIN"; username: string }
-    | { type: "MESSAGE"; content: string }
+    | { type: "JOIN"; username?: string }
+    | { type: "MESSAGE"; content?: string }
     | { type: "GET_USERS" };
 
 export type ServerEvent =
