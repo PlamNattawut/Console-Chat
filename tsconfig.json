@@ -3,17 +3,21 @@
         "target": "ES2022",
         "module": "ESNext",
         "moduleResolution": "bundler",
-        "types": ["@types/bun", "@types/node"],
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        },
+        "types": [
+            "bun"
+        ],
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "rootDir": "src",
         "outDir": "dist"
     },
     "include": [
-        "src/**/*.ts"
-    ],
-    "exclude": [
-        "src/**/*.test.ts"
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "**/*.test.ts"
     ]
 }
