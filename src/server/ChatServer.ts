@@ -22,10 +22,6 @@ export class ChatServer {
             console.log("Client connected");
             this.aliveSockets.add(socket);
 
-            socket.on("pong", () => {
-                this.aliveSockets.add(socket);
-            });
-
             socket.on("message", (data) => {
                 try {
                     const action = JSON.parse(data.toString()) as ClientAction;
@@ -62,7 +58,7 @@ export class ChatServer {
                     return socket.terminate();
                 }
                 this.aliveSockets.delete(socket);
-                socket.ping();
+                this.sendTo(socket, { type: "PING" });
             });
         }, 10000); // Check every 10 seconds
 
@@ -148,6 +144,11 @@ export class ChatServer {
                     type: "USERS_LIST",
                     users
                 });
+                break;
+            }
+
+            case "PONG": {
+                this.aliveSockets.add(socket);
                 break;
             }
         }

@@ -20,6 +20,13 @@ export class ChatClient {
         this.socket.on("message", (data) => {
             try {
                 const event = JSON.parse(data.toString()) as ServerEvent;
+                
+                // Intercept application-level PING and reply automatically
+                if (event.type === "PING") {
+                    this.sendAction({ type: "PONG" });
+                    return;
+                }
+                
                 onEvent(event);
             } catch (error) {
                 console.error("Failed to parse server event:", error);
