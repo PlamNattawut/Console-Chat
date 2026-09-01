@@ -3,48 +3,59 @@ import { validateUsername } from "../validation/validation";
 
 export class UserService {
     private readonly users = new Map<string, User>();
+    private readonly usernameToId = new Map<string, string>();
 
     createUser(username: string): User {
+        const trimmed = (username ?? "").trim();
+        const existing = this.getUserByUsername(trimmed);
+        if (existing) {
+            return { ...existing };
+        }
+
         const user: User = {
             id: crypto.randomUUID(),
-            username
+            username: trimmed
         };
 
         this.users.set(user.id, user);
+        this.usernameToId.set(trimmed.toLowerCase(), user.id);
 
-        return user;
+        return { ...user };
     }
 
     getUser(id: string): User | undefined {
-        return this.users.get(id);
+        if (!id || typeof id !== "string") return undefined;
+        const user = this.users.get(id);
+        return user ? { ...user } : undefined;
     }
 
     getUserByUsername(username: string | null | undefined): User | undefined {
-        if (!username || typeof username !== "string") {
+        if (!username || typeof username !== "string" || !username.trim()) {
             return undefined;
         }
-        const normalized = username.trim().toLowerCase();
-        for (const user of this.users.values()) {
-            if (user.username.trim().toLowerCase() === normalized) {
-                return user;
-            }
-        }
-        return undefined;
+        const id = this.usernameToId.get(username.trim().toLowerCase());
+        if (!id) return undefined;
+        return this.getUser(id);
     }
 
     isUsernameTaken(username: string | null | undefined): boolean {
-        if (!username || typeof username !== "string") {
+        if (!username || typeof username !== "string" || !username.trim()) {
             return false;
         }
-        return this.getUserByUsername(username) !== undefined;
+        return this.usernameToId.has(username.trim().toLowerCase());
     }
 
     removeUser(id: string): boolean {
-        return this.users.delete(id);
+        if (!id || typeof id !== "string") return false;
+        const user = this.users.get(id);
+        if (!user) return false;
+        this.users.delete(id);
+        this.usernameToId.delete(user.username.toLowerCase());
+        return true;
     }
 
     getAllUsers(): User[] {
-        return [...this.users.values()];
+        return Array.from(this.users.values()).map(user => ({ ...user }));
     }
 }
 
