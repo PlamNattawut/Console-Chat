@@ -7,15 +7,14 @@ import { parseCommand } from "../command/command";
 import { ServerEvent } from "../contracts/message";
 
 export class App {
-    private readonly client: ChatClient;
+    private client!: ChatClient;
     private readonly logService: FileLogService;
     private ui?: TerminalUI;
 
-    private state: "AWAITING_USERNAME" | "CHATTING" = "AWAITING_USERNAME";
+    private state: "AWAITING_SERVER_IP" | "AWAITING_USERNAME" | "CHATTING" = "AWAITING_SERVER_IP";
     private currentUser?: { id: string; username: string };
 
     constructor() {
-        this.client = new ChatClient("ws://localhost:8080");
         this.logService = new FileLogService("./chat.log");
     }
 
@@ -24,8 +23,41 @@ export class App {
 
         this.ui.addMessage("╔══════════════════════════════════════════════════════════════╗");
         this.ui.addMessage("║                💬 Welcome to Terminal Chat!                  ║");
-        this.ui.addMessage("║   Please enter your desired username below to join the chat. ║");
+        this.ui.addMessage("║   Please enter the Server IP (leave empty for localhost).    ║");
         this.ui.addMessage("╚══════════════════════════════════════════════════════════════╝\n");
+        this.ui.setPlaceholder("Server IP (e.g. 192.168.1.45)...");
+
+        this.ui.onSubmit((input) => {
+            if (this.state === "AWAITING_SERVER_IP") {
+                this.handleServerIpSubmit(input);
+            } else if (this.state === "AWAITING_USERNAME") {
+                this.handleUsernameSubmit(input);
+            } else {
+                if (!input) return;
+                this.handleChatSubmit(input);
+            }
+        });
+    }
+
+    private formatServerUrl(input: string): string {
+        if (input.startsWith("ws://") || input.startsWith("wss://")) return input;
+        
+        let address = input.replace(/^(https?:\/\/|tcp:\/\/)/, "");
+        
+        if (address.includes("ngrok-free.app") || address.includes("ngrok.io")) {
+            return `wss://${address}`;
+        }
+        
+        return address.includes(":") ? `ws://${address}` : `ws://${address}:8080`;
+    }
+
+    private handleServerIpSubmit(input: unknown): void {
+        const rawInput = typeof input === "string" && input.trim() !== "" ? input.trim() : "localhost";
+        const url = this.formatServerUrl(rawInput);
+
+        this.client = new ChatClient(url);
+
+        this.ui?.addMessage(`⏳ Connecting to ${url}...`);
 
         this.client.connect(
             (event: ServerEvent) => {
@@ -33,20 +65,15 @@ export class App {
             },
             () => {
                 this.ui?.addMessage("⚡ Connected to WebSocket server.");
+                this.state = "AWAITING_USERNAME";
+                this.ui?.setPlaceholder("Type your username...");
+                this.ui?.addMessage("\n👉 Please enter your desired username below to join the chat:");
             },
             (error: Error) => {
                 this.ui?.addMessage(`⚠️ Connection error: ${error.message}`);
+                this.ui?.addMessage("👉 Please enter the Server IP again (leave empty for localhost):");
             }
         );
-
-        this.ui.onSubmit((input) => {
-            if (this.state === "AWAITING_USERNAME") {
-                this.handleUsernameSubmit(input);
-            } else {
-                if (!input) return;
-                this.handleChatSubmit(input);
-            }
-        });
     }
 
     private handleUsernameSubmit(input: unknown): void {
@@ -139,4 +166,4 @@ export class App {
                 break;
         }
     }
-}
+}

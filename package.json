@@ -4,6 +4,8 @@
   "scripts": {
     "server": "bun src/server/index.ts",
     "client": "bun src/index.ts",
+    "mix:server": "bun src/mix/server.ts",
+    "mix:client": "bun src/mix/client.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "bun test"
