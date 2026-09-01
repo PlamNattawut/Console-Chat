@@ -14,14 +14,14 @@ const ALLOWED_USERNAME_REGEX = /^[a-zA-Z0-9_\-]+$/;
 // Regex for detecting more than 2 consecutive identical characters (e.g. aaa, ooo, eeee)
 const CONSECUTIVE_IDENTICAL_REGEX = /(.)\1{2,}/i;
 
-// Regex for detecting 4 or more consecutive consonants
-const CONSECUTIVE_CONSONANTS_REGEX = /[bcdfghjklmnpqrstvwxz]{4,}/i;
+// Regex for detecting 6 or more consecutive consonants
+const CONSECUTIVE_CONSONANTS_REGEX = /[bcdfghjklmnpqrstvwxz]{6,}/i;
 
-// Regex for detecting 3 or more consecutive vowels
-const CONSECUTIVE_VOWELS_REGEX = /[aeiou]{3,}/i;
+// Regex for detecting 4 or more consecutive vowels (e.g. aeiou)
+const CONSECUTIVE_VOWELS_REGEX = /[aeiou]{4,}/i;
 
 // Regex for alternating repeating patterns (e.g. adada, ababa, xyxyx)
-const ALTERNATING_PATTERN_REGEX = /([a-z])([a-z])\1\2\1/i;
+const ALTERNATING_PATTERN_REGEX = /^([a-z])([a-z])\1\2\1$/i;
 
 // Unnatural onset patterns (e.g. aa not followed by ron/liyah like aats, aaf)
 const UNNATURAL_DOUBLE_VOWEL_ONSET = /^aa(?!ron|liyah)/i;
@@ -39,18 +39,17 @@ const KEYBOARD_WALKS = [
     "sdfg", "gfds", "erty", "ytre", "rtyu", "uytr",
     "tyui", "iuyt", "yuio", "oiuy", "uiop", "poiu",
     "xcvb", "bvcz", "cvbn", "nbvc", "vbnm", "mnbv",
-    "dasf", "fasd", "fsda", "sfda", "dsaf", "adfs", "afds", "dafs", "fads",
+    "dasf", "fasd", "fsda", "sfda", "dsaf", "adfs", "afds", "dafs", "fads", "asfd",
     "weqt", "twet", "qtw"
 ];
 
 // Left-hand only keyboard keys
 const LEFT_HAND_KEYS = new Set("qwertasedfgzxcv".split(""));
 
-// Reserved words list for substring matching (normalized without '-' or '_')
-const RESERVED_SUBSTRINGS = [
+// Reserved words list
+const RESERVED_WORDS = [
     "admin",
-    "fackadmin",
-    "fakeadmin",
+    "administrator",
     "system",
     "server",
     "root",
@@ -58,11 +57,9 @@ const RESERVED_SUBSTRINGS = [
     "superuser",
     "moderator",
     "null",
-    "undefined"
-];
-
-// Reserved words list for exact matching
-const RESERVED_EXACT_NAMES = new Set([
+    "undefined",
+    "fackadmin",
+    "fakeadmin",
     "bot",
     "mod",
     "guest",
@@ -73,7 +70,7 @@ const RESERVED_EXACT_NAMES = new Set([
     "staff",
     "helpdesk",
     "official"
-]);
+];
 
 // Check if string is gibberish or keyboard smash
 export const isGibberish = (name: string): boolean => {
@@ -96,8 +93,8 @@ export const isGibberish = (name: string): boolean => {
         return true;
     }
 
-    // 4. Alternating repeating patterns (e.g. adada, ababa, cdcdc)
-    if (ALTERNATING_PATTERN_REGEX.test(lower)) {
+    // 4. Alternating repeating patterns (e.g. adada, ababa, xyxyx)
+    if (ALTERNATING_PATTERN_REGEX.test(lettersOnly)) {
         return true;
     }
 
@@ -113,12 +110,12 @@ export const isGibberish = (name: string): boolean => {
         }
     }
 
-    // 7. Excessive consecutive consonants (>= 4 consonants in a row, e.g. sfddc in gdasfddc232)
+    // 7. Excessive consecutive consonants (>= 6 consonants in a row)
     if (CONSECUTIVE_CONSONANTS_REGEX.test(lower)) {
         return true;
     }
 
-    // 8. Excessive consecutive vowels (>= 3 vowels in a row, e.g. aeiou)
+    // 8. Excessive consecutive vowels (>= 4 vowels in a row)
     if (CONSECUTIVE_VOWELS_REGEX.test(lower)) {
         return true;
     }
@@ -138,6 +135,56 @@ export const isGibberish = (name: string): boolean => {
                 return true;
             }
         }
+    }
+
+    return false;
+};
+
+// Check if username is reserved or uses Leetspeak evasion
+const isReservedUsername = (value: string): boolean => {
+    const lower = value.toLowerCase();
+
+    const leetDecoded = lower
+        .replace(/0/g, "o")
+        .replace(/1/g, "i")
+        .replace(/3/g, "e")
+        .replace(/4/g, "a")
+        .replace(/5/g, "s")
+        .replace(/7/g, "t")
+        .replace(/@/g, "a")
+        .replace(/\$/g, "s");
+
+    const forms = [
+        lower,
+        lower.replace(/[-_]/g, ""),
+        leetDecoded,
+        leetDecoded.replace(/[-_]/g, ""),
+        leetDecoded.replace(/[^a-z]/g, "")
+    ];
+
+    for (const keyword of RESERVED_WORDS) {
+        if (keyword.length >= 4) {
+            for (const form of forms) {
+                if (form.includes(keyword)) {
+                    return true;
+                }
+            }
+        } else {
+            const tokenRegex = new RegExp(`(^|[_-]|\\d)${keyword}([_-]|\\d|$)`, "i");
+            for (const form of [lower, leetDecoded]) {
+                if (form === keyword || tokenRegex.test(form)) {
+                    return true;
+                }
+                if (form.startsWith(keyword + "_") || form.startsWith(keyword + "-") || (keyword === "bot" && form.startsWith("bot")) || (keyword === "mod" && form.startsWith("mod_"))) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    const rolePrefixRegex = /^(bot|mod|guest|staff|owner|operator|support|helpdesk|official|admin|system|server|root)(\d|_|-|$)/i;
+    if (rolePrefixRegex.test(lower) || rolePrefixRegex.test(leetDecoded)) {
+        return true;
     }
 
     return false;
@@ -202,16 +249,8 @@ export const validateUsername = (
         return "Username cannot be random or gibberish text";
     }
 
-    // 11. Check for reserved/forbidden names (Admin, System, fackAdmin, etc.)
-    const normalized = value.toLowerCase().replace(/[-_]/g, "");
-    for (const reserved of RESERVED_SUBSTRINGS) {
-        if (normalized.includes(reserved)) {
-            return `Username cannot contain reserved name '${reserved}'`;
-        }
-    }
-
-    const lowerExact = value.toLowerCase();
-    if (RESERVED_EXACT_NAMES.has(lowerExact)) {
+    // 11. Check for reserved/forbidden names (Admin, System, fackAdmin, bot1, Adm1n, etc.)
+    if (isReservedUsername(value)) {
         return `Username '${value}' is reserved and not allowed`;
     }
 
