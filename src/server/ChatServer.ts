@@ -8,6 +8,8 @@ export class ChatServer {
     private readonly wss: WebSocketServer;
     private readonly userService = new UserService();
     private readonly socketUserMap = new Map<WebSocket, string>(); // socket -> userId
+    private readonly aliveSockets = new WeakSet<WebSocket>();
+    private pingInterval?: NodeJS.Timeout;
 
     constructor(private readonly port: number) {
         this.wss = new WebSocketServer({
@@ -18,6 +20,11 @@ export class ChatServer {
     start(): void {
         this.wss.on("connection", (socket: WebSocket) => {
             console.log("Client connected");
+            this.aliveSockets.add(socket);
+
+            socket.on("pong", () => {
+                this.aliveSockets.add(socket);
+            });
 
             socket.on("message", (data) => {
                 try {
@@ -46,6 +53,21 @@ export class ChatServer {
                     console.log("Unregistered client disconnected");
                 }
             });
+        });
+
+        this.pingInterval = setInterval(() => {
+            this.wss.clients.forEach((socket) => {
+                if (!this.aliveSockets.has(socket)) {
+                    console.log("Terminating unresponsive client");
+                    return socket.terminate();
+                }
+                this.aliveSockets.delete(socket);
+                socket.ping();
+            });
+        }, 10000); // Check every 10 seconds
+
+        this.wss.on("close", () => {
+            clearInterval(this.pingInterval);
         });
 
         console.log(`WebSocket server running on port ${this.port}`);
